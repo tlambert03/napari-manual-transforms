@@ -1,21 +1,10 @@
 name: napari-manual-transforms
 display_name: Manual Transforms
 contributions:
-  commands: 
-    - id: napari-manual-transforms.make_qwidget
-      python_name: napari_manual_transforms._widget:ExampleQWidget
-      title: Make example QWidget
-    - id: napari-manual-transforms.make_magic_widget
-      python_name: napari_manual_transforms._widget:example_magic_widget
-      title: Make example magic widget
-    - id: napari-manual-transforms.make_func_widget
-      python_name: napari_manual_transforms._widget:example_function_widget
-      title: Make example function widget   
+  commands:
+    - id: napari-manual-transforms.make_rotation_helper
+      python_name: napari_manual_transforms:RotationWidget
+      title: Make Rotation Helper
   widgets:
-    - command: napari-manual-transforms.make_qwidget
-      display_name: Example QWidget
-    - command: napari-manual-transforms.make_magic_widget
-      display_name: Example Magic Widget
-    - command: napari-manual-transforms.make_func_widget
-      autogenerate: true
-      display_name: Example Function Widget 
+    - command: napari-manual-transforms.make_rotation_helper
+      display_name: Rotation Helper

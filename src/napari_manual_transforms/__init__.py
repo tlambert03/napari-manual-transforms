@@ -1,11 +1,11 @@
+from importlib import metadata
 
 try:
-    from ._version import version as __version__
-except ImportError:
-    __version__ = "unknown"
+    __version__ = metadata.version("napari-manual-transforms")
+except metadata.PackageNotFoundError:
+    # package is not installed
+    __version__ = "uninstalled"
 
+from ._widget import RotationWidget
 
-
-
-
-from ._widget import ExampleQWidget, example_magic_widget
+__all__ = ["RotationWidget"]
