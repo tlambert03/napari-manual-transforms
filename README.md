@@ -7,26 +7,23 @@
 [![codecov](https://codecov.io/gh/tlambert03/napari-manual-transforms/branch/main/graph/badge.svg)](https://codecov.io/gh/tlambert03/napari-manual-transforms)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-manual-transforms)](https://napari-hub.org/plugins/napari-manual-transforms)
 
-Interface to manually edit layer affine transforms
+Interface to manually edit layer affine transforms.
+
+Alt-Drag to rotate a layer independently of the rest.
+
+![Plugin Preview](/preview.jpeg)
+
+(currently, focusing on rigid rotations.)
 
 ----------------------------------
 
 This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
 
-<!--
-Don't miss the full getting started guide to set up your new package:
-https://github.com/napari/cookiecutter-napari-plugin#getting-started
-
-and review the napari docs for plugin developers:
-https://napari.org/plugins/stable/index.html
--->
-
 ## Installation
 
-You can install `napari-manual-transforms` via [pip]:
+<!-- You can install `napari-manual-transforms` via [pip]:
 
-    pip install napari-manual-transforms
-
+    pip install napari-manual-transforms -->
 
 
 To install latest development version :

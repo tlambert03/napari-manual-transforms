@@ -4,6 +4,7 @@ import contextlib
 from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
+from magicgui.widgets import Table
 from pytransform3d import rotations, transformations
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QDial, QGridLayout, QLabel, QPushButton, QWidget
@@ -81,19 +82,19 @@ class RotationWidget(LayerFollower):
 
         _txt = QLabel("(hold alt while dragging canvas to edit)")
         _txt.setStyleSheet("font-size: 9pt; color: #AAA")
-        self.layout().addWidget(_txt, 0, 0, 2, 2)
+        self.layout().addWidget(_txt, 0, 0, 1, 2)
         for x, l in enumerate("ZYX"):
             self._dials[x] = self._make_dial(use_dials)
             if x == 1:
                 self._dials[x].setRange(-90, 90)
             r = self.layout().rowCount()
-            self.layout().addWidget(QLabel(f"↻ {l}"), r, 0)
-            self.layout().addWidget(self._dials[x], r, 1)
+            self.layout().addWidget(QLabel(f"↻ {l}"), r, 0, 1, 1)
+            self.layout().addWidget(self._dials[x], r, 1, 1, 1)
 
         self._reset_rot = QPushButton("reset rotation")
         self._reset_rot.clicked.connect(self._reset_rotation)
         self.layout().addWidget(
-            self._reset_rot, self.layout().rowCount(), 0, 2, 2
+            self._reset_rot, self.layout().rowCount(), 0, 1, 2
         )
 
         for i, l in enumerate("ZYX"):
@@ -103,16 +104,21 @@ class RotationWidget(LayerFollower):
                 wdg.setValue(self._active.data.shape[i] // 2)
             wdg.valueChanged.connect(self._set_euler)
             r = self.layout().rowCount()
-            self.layout().addWidget(QLabel(f"{l} orig"), r, 0)
-            self.layout().addWidget(wdg, r, 1)
+            self.layout().addWidget(QLabel(f"{l} orig"), r, 0, 1, 1)
+            self.layout().addWidget(wdg, r, 1, 1, 1)
             self._orig[i] = wdg
 
         self._reset_orig = QPushButton("center origin")
         self._reset_orig.clicked.connect(self._reset_origin)
-        self.layout().addWidget(
-            self._reset_orig, self.layout().rowCount(), 0, 2, 2
-        )
-        self.layout().setRowStretch(self.layout().rowCount(), 1)
+        r = self.layout().rowCount()
+        self.layout().addWidget(self._reset_orig, r, 0, 1, 2)
+
+        self._table = Table(np.eye(4))
+        self._table.native.horizontalHeader().hide()
+        self._table.native.verticalHeader().hide()
+
+        self.layout().addWidget(self._table.native, r + 1, 0, 1, 2)
+        self.layout().setRowStretch(r + 2, 1)
 
     def _connect_viewer(self, viewer: napari.Viewer):
         super()._connect_viewer(viewer)
@@ -171,6 +177,7 @@ class RotationWidget(LayerFollower):
         attr = event.type
         if attr == "affine":
             self._update_dials()
+            self._table.value = self._active.affine.affine_matrix
 
     def _update_dials(self):
         for dial, angle in zip(self._dials, self._get_euler()):
