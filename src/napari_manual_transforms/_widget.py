@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
@@ -14,11 +15,12 @@ from ._util import _Quaternion
 
 if TYPE_CHECKING:
     import napari.layers
+    import napari.viewer
     from napari.utils.events import Event
 
 
 class LayerFollower(QWidget):
-    def __init__(self, viewer) -> None:
+    def __init__(self, viewer: napari.Viewer) -> None:
         self._viewer: Optional[napari.Viewer] = None
         self._active: Optional[napari.layers.Layer] = None
         super().__init__()
@@ -65,12 +67,13 @@ class LayerFollower(QWidget):
     # cleanup
 
     def __del__(self):
-        self._disconnect_viewer()
-        self._disconnect_layer()
+        with contextlib.suppress(Exception):
+            self._disconnect_viewer()
+            self._disconnect_layer()
 
 
 class RotationWidget(LayerFollower):
-    def __init__(self, viewer, use_dials=False) -> None:
+    def __init__(self, viewer: napari.viewer.Viewer, use_dials=False) -> None:
         super().__init__(viewer)
         self.setLayout(QGridLayout())
         self._dials: List[Optional[QDial]] = [None, None, None]
