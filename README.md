@@ -5,17 +5,23 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/napari-manual-transforms.svg?color=green)](https://python.org)
 [![tests](https://github.com/tlambert03/napari-manual-transforms/workflows/tests/badge.svg)](https://github.com/tlambert03/napari-manual-transforms/actions)
 [![codecov](https://codecov.io/gh/tlambert03/napari-manual-transforms/branch/main/graph/badge.svg)](https://codecov.io/gh/tlambert03/napari-manual-transforms)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-manual-transforms)](https://napari-hub.org/plugins/napari-manual-transforms)
 
 Interface to manually edit layer affine transforms.
 
-Alt-Drag to rotate a layer independently of the rest.
+- express rotations as quaternion, euler angle, or axis + angle.
+- allows rotation around arbitrary origin
+- currently, focusing on rigid rotations
+- Alt-Drag to rotate a layer independently of the rest.
+- image resampling coming (i.e. "apply" the transformation to create new dataset)
 
 ![Plugin Preview](/preview.jpeg)
 
-currently, focusing on rigid rotations.  Note: this also only works on Image layers for now.
+caveats:
 
-## Try it out:
+- only works on 3D Image layers for now, open a feature request for other dims/layers.
+- will likely result in "Non-orthogonal slicing is being requested" warnings in 2D view.
+
+## Try it out
 
 ```python
 
@@ -30,27 +36,21 @@ napari.run()
 
 ```
 
-
 ----------------------------------
-
-This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
 
 ## Installation
 
-<!-- You can install `napari-manual-transforms` via [pip]:
+You can install `napari-manual-transforms` via [pip]:
 
-    pip install napari-manual-transforms -->
-
+```sh
+pip install napari-manual-transforms
+```
 
 To install latest development version :
 
-    pip install git+https://github.com/tlambert03/napari-manual-transforms.git
-
-
-## Contributing
-
-Contributions are very welcome. Tests can be run with [tox], please ensure
-the coverage at least stays the same before you submit a pull request.
+```sh
+pip install git+https://github.com/tlambert03/napari-manual-transforms.git
+```
 
 ## License
 

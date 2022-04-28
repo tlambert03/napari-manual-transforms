@@ -110,7 +110,6 @@ class RotationWidget(LayerFollower, RotationView):
         super()._disconnect_viewer()
 
     def _on_model_changed(self):
-        # self._layer.data = self._model.rotation_vector
         self._update_active()
 
     def _center_origin(self):
@@ -118,10 +117,13 @@ class RotationWidget(LayerFollower, RotationView):
             self._model.origin = np.asarray(self._active.data.shape) // 2
 
     def _update_active(self) -> None:
-        # TODO...
-        if isinstance(self._active, (Image,)):
-            with self._model.valueChanged.blocked():
-                self._active.affine = self._model.transform
+        # TODO... add support for 2d
+        if not isinstance(self._active, Image) or self._active.data.ndim < 3:
+            self.setEnabled(False)
+            return
+        self.setEnabled(True)
+        with self._model.valueChanged.blocked():
+            self._active.affine = self._model.transform
 
     def _on_mouse_drag(self, viewer, event):
         """update layer affine when alt-dragging."""
