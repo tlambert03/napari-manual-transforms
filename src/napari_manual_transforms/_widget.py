@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
-from magicgui.widgets import Table
-from pytransform3d import rotations, transformations
-from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QDial, QGridLayout, QLabel, QPushButton, QWidget
-from superqt import QLabeledSlider
-from superqt.utils import signals_blocked
+from napari.layers import Image
+from qtpy.QtWidgets import QLabel, QPushButton, QWidget
 from vispy.util.keys import ALT
 
-from ._util import _Quaternion
+from napari_manual_transforms._tform_widget import RotationView
+from napari_manual_transforms._util import _Quaternion, transform_array_3d
 
 if TYPE_CHECKING:
     import napari.layers
@@ -21,10 +18,11 @@ if TYPE_CHECKING:
 
 
 class LayerFollower(QWidget):
-    def __init__(self, viewer: napari.Viewer) -> None:
+    def __init__(self, viewer: napari.viewer.Viewer, parent=None) -> None:
+        assert viewer
         self._viewer: Optional[napari.Viewer] = None
         self._active: Optional[napari.layers.Layer] = None
-        super().__init__()
+        super().__init__(parent)
         self._connect_viewer(viewer)
 
     # viewer connections
@@ -73,73 +71,66 @@ class LayerFollower(QWidget):
             self._disconnect_layer()
 
 
-class RotationWidget(LayerFollower):
-    def __init__(self, viewer: napari.viewer.Viewer, use_dials=False) -> None:
-        super().__init__(viewer)
-        self.setLayout(QGridLayout())
-        self._dials: List[Optional[QDial]] = [None, None, None]
-        self._orig: List[Optional[QLabeledSlider]] = [None, None, None]
-
-        _txt = QLabel("(hold alt while dragging canvas to edit)")
-        _txt.setStyleSheet("font-size: 9pt; color: #AAA")
-        self.layout().addWidget(_txt, 0, 0, 1, 2)
-        for x, l in enumerate("ZYX"):
-            self._dials[x] = self._make_dial(use_dials)
-            if x == 1:
-                self._dials[x].setRange(-90, 90)
-            r = self.layout().rowCount()
-            self.layout().addWidget(QLabel(f"↻ {l}"), r, 0, 1, 1)
-            self.layout().addWidget(self._dials[x], r, 1, 1, 1)
-
-        self._reset_rot = QPushButton("reset rotation")
-        self._reset_rot.clicked.connect(self._reset_rotation)
-        self.layout().addWidget(
-            self._reset_rot, self.layout().rowCount(), 0, 1, 2
+class RotationWidget(LayerFollower, RotationView):
+    def __init__(self, viewer: napari.viewer.Viewer = None, parent=None):
+        self._help = QLabel("(hold alt while dragging canvas to edit)")
+        self._help.setStyleSheet(
+            "font-size: 9pt; color: #AAA; text-align: center;"
         )
+        super().__init__(viewer, parent)
 
-        for i, l in enumerate("ZYX"):
-            wdg = QLabeledSlider(Qt.Horizontal)
-            wdg.setRange(-1000, 1000)
-            if self._active is not None:
-                wdg.setValue(self._active.data.shape[i] // 2)
-            wdg.valueChanged.connect(self._set_euler)
-            r = self.layout().rowCount()
-            self.layout().addWidget(QLabel(f"{l} orig"), r, 0, 1, 1)
-            self.layout().addWidget(wdg, r, 1, 1, 1)
-            self._orig[i] = wdg
+        self.layout().insertWidget(0, self._help)
 
-        self._reset_orig = QPushButton("center origin")
-        self._reset_orig.clicked.connect(self._reset_origin)
-        r = self.layout().rowCount()
-        self.layout().addWidget(self._reset_orig, r, 0, 1, 2)
+        self._center_orig = QPushButton("center origin")
+        self._center_orig.clicked.connect(self._center_origin)
+        self.layout().addWidget(self._center_orig)
 
-        self._table = Table(np.eye(4))
-        self._table.native.horizontalHeader().hide()
-        self._table.native.verticalHeader().hide()
+        # self._resample_btn = QPushButton("resample")
+        # self._resample_btn.clicked.connect(self._resample)
+        # self.layout().addWidget(self._resample_btn)
 
-        self.layout().addWidget(self._table.native, r + 1, 0, 1, 2)
-        self.layout().setRowStretch(r + 2, 1)
+        # try:
+        #     self._layer = viewer.layers["rotation axis"]
+        # except (AttributeError, KeyError):
+        #     self._layer = viewer.add_vectors(
+        #         self._model.rotation_vector, name="rotation axis"
+        #     )
+
+        self._model.valueChanged.connect(self._on_model_changed)
+        self._on_model_changed()
 
     def _connect_viewer(self, viewer: napari.Viewer):
         super()._connect_viewer(viewer)
         viewer.mouse_drag_callbacks.append(self._on_mouse_drag)
+
+    def _disconnect_viewer(self):
+        if self._viewer is not None:
+            with contextlib.suppress(Exception):
+                self._viewer.mouse_drag_callbacks.remove(self._on_mouse_drag)
+        super()._disconnect_viewer()
+
+    def _on_model_changed(self):
+        # self._layer.data = self._model.rotation_vector
+        self._update_active()
+
+    def _center_origin(self):
+        if self._active is not None:
+            self._model.origin = np.asarray(self._active.data.shape) // 2
+
+    def _update_active(self) -> None:
+        # TODO...
+        if isinstance(self._active, (Image,)):
+            with self._model.valueChanged.blocked():
+                self._active.affine = self._model.transform
 
     def _on_mouse_drag(self, viewer, event):
         """update layer affine when alt-dragging."""
         if self._active is None or ALT not in event.modifiers:
             return
 
-        dq = transformations.dual_quaternion_from_transform(
-            self._active.affine.affine_matrix
-        )
-
-        q = _Quaternion(*dq[:4])
+        q = _Quaternion(*self._model.quaternion)
         p2 = None
         wh = event.source.size
-        M = np.eye(4)
-        T = np.eye(4)
-        T[:3, -1] = np.array([d.value() for d in self._orig])
-
         yield
 
         while event.type == "mouse_move":
@@ -151,56 +142,41 @@ class RotationWidget(LayerFollower):
             qp1 = _Quaternion.from_arcball(p2, wh)
             q = qp2 * qp1 * q
 
-            M[:3, :3] = rotations.matrix_from_quaternion((q.w, q.x, q.y, q.z))
-            self._active.affine = T @ M @ np.linalg.inv(T)
+            self._model.quaternion = (q.w, q.x, q.y, q.z)
             yield
 
-    def _make_dial(self, use_dial: bool = True):
-        if use_dial:
-            dial = QDial()
-            dial.setWrapping(True)
-        else:
-            dial = QLabeledSlider(Qt.Orientation.Horizontal)
-        dial.setVisible(self._active is not None)
-        dial.setRange(-180, 180)
-        dial.valueChanged.connect(self._set_euler)
-        return dial
-
-    def _on_active_layer_change(self, event: Event):
-        super()._on_active_layer_change(event)
-        for d in self._dials:
-            d.setVisible(event.value is not None)
-        if event.value is not None:
-            self._update_dials()
-
     def _on_layer_event(self, event):
-        attr = event.type
-        if attr == "affine":
-            self._update_dials()
-            self._table.value = self._active.affine.affine_matrix
+        if event.type == "affine":
+            self._update_from_layer()
 
-    def _update_dials(self):
-        for dial, angle in zip(self._dials, self._get_euler()):
-            with signals_blocked(dial):
-                dial.setValue(np.rad2deg(angle))
-
-    def _reset_rotation(self):
-        self._active.affine = np.eye(4)
-
-    def _reset_origin(self):
+    def _update_from_layer(self):
         if self._active is not None:
-            for i, w in enumerate(self._orig):
-                w.setValue(self._active.data.shape[i] // 2)
+            self._model.matrix = self._active.affine.affine_matrix[:3, :3]
 
-    def _get_euler(self) -> List[float]:
-        aff = self._active.affine.affine_matrix
-        return list(rotations.euler_xyz_from_matrix(aff[:3, :3]))
+    def _connect_layer(self, layer: napari.layers.Layer):
+        super()._connect_layer(layer)
+        self._update_from_layer()
+        self._help.show()
 
-    def _set_euler(self) -> None:
-        v = [np.deg2rad(d.value()) for d in self._dials]
-        M = np.eye(4)
-        M[:3, :3] = rotations.matrix_from_euler_xyz(v)
+    def _disconnect_layer(self):
+        super()._disconnect_layer()
+        self._help.hide()
 
-        T = np.eye(4)
-        T[:3, -1] = np.array([d.value() for d in self._orig])
-        self._active.affine = T @ M @ np.linalg.inv(T)
+    def _resample(self):
+        if self._active is not None:
+            data = transform_array_3d(self._active.data, self._model.matrix)
+            new_layer = type(self._active)(
+                data, name=f"resampled {self._active.name}"
+            )
+            self._viewer.add_layer(new_layer)
+
+
+if __name__ == "__main__":
+    import napari
+
+    v = napari.Viewer()
+    v.open_sample("napari", "cells3d")
+    v.dims.ndisplay = 3
+    wdg = RotationWidget(v)
+    v.window.add_dock_widget(wdg)
+    napari.run()

@@ -13,7 +13,7 @@ Alt-Drag to rotate a layer independently of the rest.
 
 ![Plugin Preview](/preview.jpeg)
 
-(currently, focusing on rigid rotations.)
+currently, focusing on rigid rotations.  Note: this also only works on Image layers for now.
 
 ## Try it out:
 
