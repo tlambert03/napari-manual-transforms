@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 from vispy.util.quaternion import Quaternion
 
@@ -22,20 +24,44 @@ class _Quaternion(Quaternion):
         yield from (self.w, self.x, self.y, self.z)
 
 
-def transform_array_3d(ary: np.ndarray, matrix) -> np.ndarray:
-    from scipy.ndimage import map_coordinates
+def _get_tform_bounds(input: np.ndarray, matrix: np.ndarray, full=True):
+    if not full:
+        return input.shape
 
-    newshape = np.asarray(ary.shape) + np.array([100, 100, 100])
-    coords = np.indices(newshape).reshape(3, -1) - np.array([[50, 50, 50]]).T
-    matrix = np.asarray(matrix)
 
-    if matrix.shape == (4, 4):
-        R, T = matrix[:3, :3], np.expand_dims(matrix[:3, -1], 1)
+def transform_array_3d(
+    ary: np.ndarray, matrix, offset, reshape=True
+) -> Tuple[np.ndarray, np.ndarray]:
+    import scipy.ndimage as ndi
+
+    if reshape:
+        # Compute transformed input bounds
+        iz, iy, ix = ary.shape
+        out_bounds = matrix @ [
+            [0, 0, 0, 0, iz, iz, iz, iz],
+            [0, 0, iy, iy, 0, 0, iy, iy],
+            [0, ix, 0, ix, 0, ix, 0, ix],
+        ]
+        # Compute the shape of the transformed input
+        out_shape = (out_bounds.ptp(axis=1) + 0.5).astype(int)
+
+        # make new larger input array.
+        # FIXME: there has to be a more efficient way using output_shape and
+        # offset, but so far I've failed...
+        growth = np.array(out_shape) - np.array(ary.shape)
+        half_g = np.abs(growth) // 2
+        ary = np.pad(ary, tuple((int(i),) for i in half_g))
+
     else:
-        R, T = matrix, np.zeros((3, 1))
+        half_g = np.zeros((3,))
 
-    transformed_coords = R @ (coords - T) + T
+    M = np.eye(4)
+    M[:3, :3] = matrix
+    T = np.eye(4)
+    T[:3, -1] = np.array(offset) + half_g
+    matrix = T @ M @ np.linalg.inv(T)
 
-    new_values = map_coordinates(ary, transformed_coords, order=1)
-
-    return new_values.reshape(newshape)
+    data = ndi.affine_transform(
+        ary, np.linalg.inv(matrix), order=1, prefilter=False
+    )
+    return (data, -half_g)

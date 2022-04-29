@@ -85,9 +85,9 @@ class RotationWidget(LayerFollower, RotationView):
         self._center_orig.clicked.connect(self._center_origin)
         self.layout().addWidget(self._center_orig)
 
-        # self._resample_btn = QPushButton("resample")
-        # self._resample_btn.clicked.connect(self._resample)
-        # self.layout().addWidget(self._resample_btn)
+        self._resample_btn = QPushButton("resample")
+        self._resample_btn.clicked.connect(self._resample)
+        self.layout().addWidget(self._resample_btn)
 
         # try:
         #     self._layer = viewer.layers["rotation axis"]
@@ -144,7 +144,12 @@ class RotationWidget(LayerFollower, RotationView):
             qp1 = _Quaternion.from_arcball(p2, wh)
             q = qp2 * qp1 * q
 
-            self._model.quaternion = (q.w, q.x, q.y, q.z)
+            _q = np.array([q.w, q.x, q.y, q.z])
+
+            if np.allclose(self._model.quaternion, -_q, atol=0.2):
+                _q *= -1
+
+            self._model.quaternion = _q
             yield
 
     def _on_layer_event(self, event):
@@ -166,9 +171,14 @@ class RotationWidget(LayerFollower, RotationView):
 
     def _resample(self):
         if self._active is not None:
-            data = transform_array_3d(self._active.data, self._model.matrix)
+            data, translate = transform_array_3d(
+                self._active.data, self._model.matrix, self._model.origin
+            )
             new_layer = type(self._active)(
-                data, name=f"resampled {self._active.name}"
+                data,
+                translate=translate,
+                blending="additive",
+                name=f"resampled {self._active.name}",
             )
             self._viewer.add_layer(new_layer)
 

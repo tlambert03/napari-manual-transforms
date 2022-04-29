@@ -12,7 +12,7 @@ Interface to manually edit layer affine transforms.
 - allows rotation around arbitrary origin
 - currently, focusing on rigid rotations
 - Alt-Drag to rotate a layer independently of the rest.
-- image resampling coming (i.e. "apply" the transformation to create new dataset)
+- image resampling (i.e. "apply" the transformation to create new dataset that can be saved)
 
 ![Plugin Preview](/preview.jpeg)
 
