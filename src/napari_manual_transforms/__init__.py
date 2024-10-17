@@ -6,6 +6,6 @@ except metadata.PackageNotFoundError:
     # package is not installed
     __version__ = "uninstalled"
 
-from ._widget import RotationWidget
+from ._widget import TransformationWidget
 
-__all__ = ["RotationWidget"]
+__all__ = ["TransformationWidget"]

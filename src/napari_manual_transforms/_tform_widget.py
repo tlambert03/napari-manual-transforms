@@ -4,6 +4,7 @@ import numpy as np
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QComboBox,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -14,11 +15,11 @@ from qtpy.QtWidgets import (
 )
 from superqt import QCollapsible, QLabeledDoubleSlider, QLabeledSlider, utils
 
-from ._model import RotationModel
+from ._model import TransformationModel
 
 
-class _RotationComponent(QWidget):
-    def __init__(self, model: RotationModel, parent=None):
+class _TransformationComponent(QWidget):
+    def __init__(self, model: TransformationModel, parent=None):
         super().__init__(parent)
 
         lay = QFormLayout()
@@ -41,7 +42,7 @@ class _RotationComponent(QWidget):
         raise NotImplementedError()
 
 
-class QuaternionView(_RotationComponent):
+class QuaternionView(_TransformationComponent):
     _q: Sequence[float]
 
     def _add_gui(self):
@@ -66,7 +67,7 @@ class QuaternionView(_RotationComponent):
 
 
 class EulerView(QWidget):
-    def __init__(self, model: RotationModel, parent=None):
+    def __init__(self, model: TransformationModel, parent=None):
         super().__init__(parent)
         self._add_gui()
         self._model = model
@@ -90,7 +91,7 @@ class EulerView(QWidget):
             QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
 
-        self._sliders: List[QLabeledDoubleSlider] = []
+        self._sliders: List[Optional[QLabeledSlider]] = []
         for i in "xyz":
             wdg = QLabeledDoubleSlider(Qt.Orientation.Horizontal)
             wdg.setRange(-180, 180)
@@ -127,7 +128,7 @@ class EulerView(QWidget):
             self._is_updating = False
 
 
-class AxisAngleView(_RotationComponent):
+class AxisAngleView(_TransformationComponent):
     def _add_gui(self):
         self._sliders: List[QLabeledDoubleSlider] = []
         for i in "xyzθ":
@@ -154,7 +155,7 @@ class AxisAngleView(_RotationComponent):
         self._model.axis_angle = xyzt
 
 
-class OriginView(_RotationComponent):
+class OriginView(_TransformationComponent):
     def _add_gui(self):
         self._sliders: List[Optional[QLabeledSlider]] = [None, None, None]
         for i, l in enumerate("ZYX"):
@@ -173,6 +174,48 @@ class OriginView(_RotationComponent):
                 sld.setValue(v)
 
 
+class TranslationView(_TransformationComponent):
+    def _add_gui(self):
+        self._spin_boxes: List[QDoubleSpinBox] = []
+        for l in "ZYX":
+            wdg = QDoubleSpinBox()
+            wdg.valueChanged.connect(self._on_change)
+            wdg.setMinimum(float("-inf"))
+            wdg.setMaximum(float("inf"))
+            self.layout().addRow(f"{l}", wdg)
+            self._spin_boxes.append(wdg)
+
+    def _on_change(self):
+        self._model.translation = [s.value() for s in self._spin_boxes]
+
+    def _update(self) -> None:
+        for v, sld in zip(self._model.translation, self._spin_boxes):
+            with utils.signals_blocked(sld):
+                sld.setValue(v)
+
+
+class ScaleView(_TransformationComponent):
+    def _add_gui(self):
+        self.spin_box: QDoubleSpinBox = QDoubleSpinBox()
+        self.spin_box.setMinimum(0.001)
+        self.spin_box.setDecimals(2)
+        self.spin_box.setSingleStep(0.1)
+        self.spin_box.valueChanged.connect(self._on_change)
+        self.layout().addRow("Scale", self.spin_box)
+
+    def _on_change(self):
+        # We must ensure that scale is not <= 0, otherwise napari breaks
+        # for the empty image output. Scaling the image up again
+        # afterwards cannot recover the image anymore.
+        safe_scale_value = max(self.spin_box.value(), 0.001)
+        self.spin_box.setValue(safe_scale_value)
+        self._model.scale = safe_scale_value
+
+    def _update(self) -> None:
+        with utils.signals_blocked(self.spin_box):
+            self.spin_box.setValue(self._model.scale)
+
+
 class _Collapsible(QCollapsible):
     def __init__(self, title: str, widget, parent: Optional[QWidget] = None):
         super().__init__(title, parent)
@@ -180,34 +223,42 @@ class _Collapsible(QCollapsible):
         self.layout().setContentsMargins(0, 0, 0, 0)
 
 
-class RotationView(QWidget):
-    def __init__(self, model: Optional[RotationModel] = None, parent=None):
+class TransformationView(QWidget):
+    def __init__(self, model: Optional[TransformationModel] = None, parent=None):
         super().__init__(parent)
-        self._model: RotationModel = model or RotationModel()
+        self._model: TransformationModel = model or TransformationModel()
 
         self._q_view = QuaternionView(self._model)
         self._e_view = EulerView(self._model)
         self._a_view = AxisAngleView(self._model)
         self._o_view = OriginView(self._model)
+        self._t_view = TranslationView(self._model)
+        self._s_view = ScaleView(self._model)
         self._q_view.layout().setContentsMargins(0, 0, 0, 0)
         self._e_view.layout().setContentsMargins(0, 0, 0, 0)
         self._a_view.layout().setContentsMargins(0, 0, 0, 0)
         self._o_view.layout().setContentsMargins(0, 0, 0, 0)
+        self._t_view.layout().setContentsMargins(0, 0, 0, 0)
+        self._s_view.layout().setContentsMargins(0, 0, 0, 0)
 
         qq = _Collapsible("Quaternion", self._q_view)
         qe = _Collapsible("Euler Angle", self._e_view)
         qa = _Collapsible("Axis && Angle", self._a_view)
         qo = _Collapsible("Origin", self._o_view)
+        qt = _Collapsible("Translation", self._t_view)
+        qs = _Collapsible("Scale", self._s_view)
 
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(qq)
         self.layout().addWidget(qe)
         self.layout().addWidget(qa)
         self.layout().addWidget(qo)
+        self.layout().addWidget(qt)
+        self.layout().addWidget(qs)
 
-        self._reset_rot = QPushButton("reset rotation")
-        self._reset_rot.clicked.connect(self._reset_rotation)
-        self.layout().addWidget(self._reset_rot)
+        self._reset_tform = QPushButton("reset transformation")
+        self._reset_tform.clicked.connect(self._reset_transformation)
+        self.layout().addWidget(self._reset_tform)
 
-    def _reset_rotation(self):
-        self._model.quaternion = (1, 0, 0, 0)
+    def _reset_transformation(self):
+        self._model.reset()
