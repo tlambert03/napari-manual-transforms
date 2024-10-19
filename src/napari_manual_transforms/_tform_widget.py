@@ -15,7 +15,7 @@ from qtpy.QtWidgets import (
 )
 from superqt import QCollapsible, QLabeledDoubleSlider, QLabeledSlider, utils
 
-from ._model import TransformationModel
+from ._model import MINIMUM_SCALE, TransformationModel
 
 
 class _TransformationComponent(QWidget):
@@ -197,19 +197,12 @@ class TranslationView(_TransformationComponent):
 class ScaleView(_TransformationComponent):
     def _add_gui(self):
         self.spin_box: QDoubleSpinBox = QDoubleSpinBox()
-        self.spin_box.setMinimum(0.001)
-        self.spin_box.setDecimals(2)
         self.spin_box.setSingleStep(0.1)
         self.spin_box.valueChanged.connect(self._on_change)
         self.layout().addRow("Scale", self.spin_box)
 
     def _on_change(self):
-        # We must ensure that scale is not <= 0, otherwise napari breaks
-        # for the empty image output. Scaling the image up again
-        # afterwards cannot recover the image anymore.
-        safe_scale_value = max(self.spin_box.value(), 0.001)
-        self.spin_box.setValue(safe_scale_value)
-        self._model.scale = safe_scale_value
+        self._model.scale = self.spin_box.value()
 
     def _update(self) -> None:
         with utils.signals_blocked(self.spin_box):

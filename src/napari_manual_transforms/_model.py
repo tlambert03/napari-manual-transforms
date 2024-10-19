@@ -4,6 +4,8 @@ import numpy as np
 from psygnal import Signal
 from pytransform3d import rotations as rot
 
+MINIMUM_SCALE = 1e-5
+
 
 # code from three.js ... haven't dug into the differences between
 # it and pytransform3d, this matches the (nice) behavior of quaternion.online
@@ -182,9 +184,9 @@ class TransformationModel:
         return self._t
 
     @translation.setter
-    def translation(self, t: Sequence[float]):
+    def translation(self, t: Sequence[float] | np.ndarray):
         """x,y,z"""
-        self._t = np.array(t)
+        self._t = np.asarray(t)
         self.valueChanged.emit()
 
     @property
@@ -209,7 +211,7 @@ class TransformationModel:
     @property
     def transform(self) -> np.ndarray:
         M = np.eye(4)
-        M[:3, :3] = self.matrix @ np.diag((self.scale,) * 3)
+        M[:3, :3] = self.matrix @ np.diag((max(self.scale, MINIMUM_SCALE),) * 3)
         M[:3, 3] = self.translation
         T = np.eye(4)
         T[:3, -1] = self.origin
