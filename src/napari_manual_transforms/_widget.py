@@ -8,7 +8,6 @@ from napari.layers import Image
 from qtpy.QtWidgets import QLabel, QPushButton, QWidget
 from vispy.util.keys import ALT
 
-from napari_manual_transforms._model import MINIMUM_SCALE
 from napari_manual_transforms._tform_widget import TransformationView
 from napari_manual_transforms._util import _Quaternion, transform_array_3d
 
@@ -164,20 +163,16 @@ class TransformationWidget(LayerFollower, TransformationView):
                 # https://math.stackexchange.com/a/1463487
                 affine_matrix = self._active.affine.affine_matrix
 
-                # Extract scaling only from first row of the rotation
-                # matrix as only single scaling factor is allowed as input.
-                scale = np.linalg.norm(affine_matrix[0, :3]).item()
-                self._model.scale = scale
+                # Recovering scale requires only one value as only
+                # isotropic scaling is supported.
+                self._model.scale = np.linalg.norm(affine_matrix[0, :3]).item()
 
                 # Adjust translation based on origin offset.
                 origin = self._model.origin
                 T = np.eye(4)
                 T[:3, -1] = origin
                 self._model.translation = (affine_matrix @ T)[:3, 3] - origin
-
-                # Prevent division by zero by using at least the minimum
-                # scaling value that is allowed as scaling input.
-                self._model.matrix = affine_matrix[:3, :3] / max(scale, MINIMUM_SCALE)
+                self._model.matrix = affine_matrix[:3, :3] / self._model.scale
 
             self._model.valueChanged.emit()
 

@@ -4,8 +4,6 @@ import numpy as np
 from psygnal import Signal
 from pytransform3d import rotations as rot
 
-MINIMUM_SCALE = 1e-5
-
 
 # code from three.js ... haven't dug into the differences between
 # it and pytransform3d, this matches the (nice) behavior of quaternion.online
@@ -72,6 +70,8 @@ def _mat2euler(R, order="XYZ"):
 
 
 class TransformationModel:
+    MIN_SCALE = 1e-6
+
     valueChanged = Signal()
 
     def __init__(
@@ -184,9 +184,14 @@ class TransformationModel:
         return self._t
 
     @translation.setter
-    def translation(self, t: Sequence[float] | np.ndarray):
+    def translation(self, t: Sequence[float]):
         """x,y,z"""
-        self._t = np.asarray(t)
+        t_arr = np.asarray(t)
+        if t_arr.ndim != 1 or len(t_arr) != 3:
+            msg = "Input must be 1D and have a length of 3"
+            raise ValueError(msg)
+
+        self._t = t_arr
         self.valueChanged.emit()
 
     @property
@@ -196,6 +201,18 @@ class TransformationModel:
     @scale.setter
     def scale(self, s: float):
         """scale"""
+        # Scale must not be below a minimum scale that would otherwise
+        # break the scaling of the transformation matrix within napari.
+        if s < self.MIN_SCALE:
+            import warnings
+
+            warnings.warn(
+                f"Scale value {s} is too low. Automatically adjusting to {self.MIN_SCALE}.",
+                UserWarning,
+                stacklevel=2,
+            )
+            s = self.MIN_SCALE
+
         self._s = s
         self.valueChanged.emit()
 
@@ -211,7 +228,7 @@ class TransformationModel:
     @property
     def transform(self) -> np.ndarray:
         M = np.eye(4)
-        M[:3, :3] = self.matrix @ np.diag((max(self.scale, MINIMUM_SCALE),) * 3)
+        M[:3, :3] = self.matrix @ np.diag((self.scale,) * 3)
         M[:3, 3] = self.translation
         T = np.eye(4)
         T[:3, -1] = self.origin

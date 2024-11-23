@@ -15,7 +15,7 @@ from qtpy.QtWidgets import (
 )
 from superqt import QCollapsible, QLabeledDoubleSlider, QLabeledSlider, utils
 
-from ._model import MINIMUM_SCALE, TransformationModel
+from ._model import TransformationModel
 
 
 class _TransformationComponent(QWidget):
