@@ -43,7 +43,7 @@ def transform_array_3d(
             [0, ix, 0, ix, 0, ix, 0, ix],
         ]
         # Compute the shape of the transformed input
-        out_shape = (out_bounds.ptp(axis=1) + 0.5).astype(int)
+        out_shape = (np.ptp(out_bounds, axis=1) + 0.5).astype(int)
 
         # make new larger input array.
         # FIXME: there has to be a more efficient way using output_shape and
