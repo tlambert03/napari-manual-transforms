@@ -43,6 +43,27 @@ def test_transformation_model_default_transformation_values() -> None:
     assert model.scale == 1.0
 
 
+def test_transformation_model_default_transformation_values_on_reset() -> None:
+    """Verify transformation model parameters are set to default when resetting."""
+    translation = (1.0, 2.0, 3.0)
+    scale = 0.5
+    quaternion = (0.5, 0.1, 0.2, 0.3)
+
+    model = TransformationModel(
+        translation=translation, scale=0.5, quaternion=quaternion
+    )
+
+    np.testing.assert_equal(translation, model.translation)
+    np.testing.assert_equal(quaternion, model.quaternion)
+    assert model.scale == scale
+
+    model.reset()
+
+    np.testing.assert_equal([0.0, 0.0, 0.0], model.translation)
+    np.testing.assert_equal([1.0, 0.0, 0.0, 0.0], model.quaternion)
+    assert model.scale == 1.0
+
+
 @pytest.mark.parametrize("translation", TRANSLATION_INPUTS)
 def test_transformation_model_translation_update(translation: Sequence[float]) -> None:
     """Verify translation updates on transformation model."""
