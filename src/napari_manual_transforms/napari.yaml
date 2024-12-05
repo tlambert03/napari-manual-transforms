@@ -3,7 +3,7 @@ display_name: Manual Transforms
 contributions:
   commands:
     - id: napari-manual-transforms.make_rotation_helper
-      python_name: napari_manual_transforms:RotationWidget
+      python_name: napari_manual_transforms:TransformationWidget
       title: Make Rotation Helper
   widgets:
     - command: napari-manual-transforms.make_rotation_helper

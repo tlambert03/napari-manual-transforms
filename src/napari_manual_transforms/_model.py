@@ -69,18 +69,28 @@ def _mat2euler(R, order="XYZ"):
         return (_z, _y, _x)
 
 
-class RotationModel:
+class TransformationModel:
+    MIN_SCALE = 1e-6
+
     valueChanged = Signal()
 
     def __init__(
         self,
         *,
+        translation: Optional[Sequence[float]] = None,
+        scale: Optional[float] = None,
         axis_angle: Optional[Sequence[float]] = None,
         quaternion: Optional[Sequence[float]] = None,
         matrix: Optional[np.ndarray] = None,
     ) -> None:
         self._q = np.array([1, 0, 0, 0])
+        self._t = np.array([0, 0, 0])
+        self._s = 1.0
         self._rotation_axis = (0, 1, 0)
+        if translation is not None:
+            self.translation = translation
+        if scale is not None:
+            self.scale = scale
         if axis_angle is not None:
             self.axis_angle = axis_angle
         elif quaternion is not None:
@@ -90,7 +100,11 @@ class RotationModel:
         self._origin = np.asarray([0, 0, 0])
 
     def __repr__(self) -> str:
-        return f"RotationModel(quaternion={self._q})"
+        rotation = f"quaternion={self._q}"
+        translation = f"translation={self._t}"
+        scale = f"scale={self._s}"
+
+        return f"TransformationModel({rotation},{translation},{scale})"
 
     def _update_rotation_axis(self):
         w, x, y, z = self._q
@@ -166,6 +180,43 @@ class RotationModel:
         self.quaternion = rot.quaternion_from_compact_axis_angle(ca)
 
     @property
+    def translation(self) -> np.ndarray:
+        return self._t
+
+    @translation.setter
+    def translation(self, t: Sequence[float]):
+        """x,y,z"""
+        t_arr = np.asarray(t)
+        if t_arr.ndim != 1 or len(t_arr) != 3:
+            msg = "Input must be 1D and have a length of 3"
+            raise ValueError(msg)
+
+        self._t = t_arr
+        self.valueChanged.emit()
+
+    @property
+    def scale(self) -> float:
+        return self._s
+
+    @scale.setter
+    def scale(self, s: float):
+        """scale"""
+        # Scale must not be below a minimum scale that would otherwise
+        # break the scaling of the transformation matrix within napari.
+        if s < self.MIN_SCALE:
+            import warnings
+
+            warnings.warn(
+                f"Scale value {s} is too low. Automatically adjusting to {self.MIN_SCALE}.",
+                UserWarning,
+                stacklevel=2,
+            )
+            s = self.MIN_SCALE
+
+        self._s = s
+        self.valueChanged.emit()
+
+    @property
     def origin(self) -> np.ndarray:
         return self._origin
 
@@ -177,10 +228,18 @@ class RotationModel:
     @property
     def transform(self) -> np.ndarray:
         M = np.eye(4)
-        M[:3, :3] = self.matrix
+        M[:3, :3] = self.matrix @ np.diag((self.scale,) * 3)
+        M[:3, 3] = self.translation
         T = np.eye(4)
         T[:3, -1] = self.origin
         return T @ M @ np.linalg.inv(T)
+
+    def reset(self):
+        """remove any transformation from image."""
+        self._q = np.array([1, 0, 0, 0])
+        self._t = np.array([0, 0, 0])
+        self._s = 1.0
+        self.valueChanged.emit()
 
     def _set_qwxyz(self, v: float, idx: int):
         """set single value of quaternion."""

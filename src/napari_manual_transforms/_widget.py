@@ -8,7 +8,7 @@ from napari.layers import Image
 from qtpy.QtWidgets import QLabel, QPushButton, QWidget
 from vispy.util.keys import ALT
 
-from napari_manual_transforms._tform_widget import RotationView
+from napari_manual_transforms._tform_widget import TransformationView
 from napari_manual_transforms._util import _Quaternion, transform_array_3d
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ class LayerFollower(QWidget):
             self._disconnect_layer()
 
 
-class RotationWidget(LayerFollower, RotationView):
+class TransformationWidget(LayerFollower, TransformationView):
     def __init__(self, viewer: napari.viewer.Viewer = None, parent=None):
         self._help = QLabel("(hold alt while dragging canvas to edit)")
         self._help.setStyleSheet(
@@ -158,7 +158,23 @@ class RotationWidget(LayerFollower, RotationView):
 
     def _update_from_layer(self):
         if self._active is not None:
-            self._model.matrix = self._active.affine.affine_matrix[:3, :3]
+            with self._model.valueChanged.blocked():
+                # Affine matrix decomposition based on
+                # https://math.stackexchange.com/a/1463487
+                affine_matrix = self._active.affine.affine_matrix
+
+                # Recovering scale requires only one value as only
+                # isotropic scaling is supported.
+                self._model.scale = np.linalg.norm(affine_matrix[0, :3]).item()
+
+                # Adjust translation based on origin offset.
+                origin = self._model.origin
+                T = np.eye(4)
+                T[:3, -1] = origin
+                self._model.translation = (affine_matrix @ T)[:3, 3] - origin
+                self._model.matrix = affine_matrix[:3, :3] / self._model.scale
+
+            self._model.valueChanged.emit()
 
     def _connect_layer(self, layer: napari.layers.Layer):
         super()._connect_layer(layer)
@@ -189,6 +205,6 @@ if __name__ == "__main__":
     v = napari.Viewer()
     v.open_sample("napari", "cells3d")
     v.dims.ndisplay = 3
-    wdg = RotationWidget(v)
+    wdg = TransformationWidget(v)
     v.window.add_dock_widget(wdg)
     napari.run()

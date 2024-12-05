@@ -1,7 +1,7 @@
 import numpy as np
 from pytransform3d.rotations import matrix_from_angle
 
-from napari_manual_transforms import RotationWidget
+from napari_manual_transforms import TransformationWidget
 
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
@@ -12,7 +12,7 @@ def test_example_q_widget(qtbot, make_napari_viewer, capsys):
     layer = viewer.add_image(np.random.random((100, 100, 100)))
 
     # create our widget, passing in the viewer
-    wdg = RotationWidget(viewer)
+    wdg = TransformationWidget(viewer)
     assert np.allclose(layer.affine.affine_matrix, np.eye(4))
     viewer.window.add_dock_widget(wdg)
 
